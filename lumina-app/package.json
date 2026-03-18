@@ -1,0 +1,9 @@
+{
+  "name": "lumina-palm-reading",
+  "version": "1.0.0",
+  "description": "Palm reading app powered by Google Gemini",
+  "scripts": {
+    "start": "npx --yes serve . -p 3000",
+    "run": "npx --yes serve . -p 3000"
+  }
+}
