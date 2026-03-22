@@ -789,7 +789,7 @@
 <script>
 // ── Config ─────────────────────────────────────────
 // Get your API key from: https://aistudio.google.com/apikey
-const GEMINI_API_KEY = GEMINI_API_KEY;
+const GEMINI_API_KEY = 'AIzaSyD6dYzDtxnehC8j95Adhz3Daenqjak8_ZA';
 const GEMINI_MODEL = 'gemini-3-flash-preview';
 
 // ── Stars ──────────────────────────────────────────
@@ -987,6 +987,11 @@ function checkUserInfo() {
   userName = nameValid ? nameRaw : null;
   userDob = dobValid ? `${m}/${d}/${y}` : null;
 }
+// Bind validation via JS (inline handlers can be blocked by CSP on Vercel)
+document.getElementById('full-name')?.addEventListener('input', checkUserInfo);
+document.getElementById('dob-month')?.addEventListener('change', checkUserInfo);
+document.getElementById('dob-day')?.addEventListener('input', checkUserInfo);
+document.getElementById('dob-year')?.addEventListener('input', checkUserInfo);
 
 const SYSTEM = `You are Lumina, a warm palm reading AI. Be concise and to the point. Avoid flowery or lengthy prose.
 
