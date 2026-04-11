@@ -787,9 +787,9 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
 // ── Config ─────────────────────────────────────────
-// Get your API key from: https://aistudio.google.com/apikey
-const GEMINI_API_KEY = 'GEMINI_API_KEY';
+// API key is read server-side from Vercel env GEMINI_API_KEY (see /api/gemini.js).
 const GEMINI_MODEL = 'gemini-3-flash-preview';
 
 // ── Stars ──────────────────────────────────────────
@@ -983,7 +983,7 @@ function checkUserInfo() {
   const dobValid = m && d >= 1 && d <= 31 && y >= 1920 && y <= 2030;
   const valid = nameValid && dobValid;
 
-  startBtn.disabled = !valid;
+  if (startBtn) startBtn.disabled = !valid;
   userName = nameValid ? nameRaw : null;
   userDob = dobValid ? `${m}/${d}/${y}` : null;
 }
@@ -992,6 +992,7 @@ document.getElementById('full-name')?.addEventListener('input', checkUserInfo);
 document.getElementById('dob-month')?.addEventListener('change', checkUserInfo);
 document.getElementById('dob-day')?.addEventListener('input', checkUserInfo);
 document.getElementById('dob-year')?.addEventListener('input', checkUserInfo);
+checkUserInfo();
 
 const SYSTEM = `You are Lumina, a warm palm reading AI. Be concise and to the point. Avoid flowery or lengthy prose.
 
@@ -1029,8 +1030,6 @@ Be direct. Each line interpretation should be 1–2 sentences. Use **bold** for 
 
 For follow-up questions, keep answers brief (2–4 sentences). Stay in character. Reference their palm when relevant. Do not repeat the full sectioned format for follow-ups.`;
 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
 function toApiContents(contents) {
   return contents.map(c => ({
     role: c.role || 'user',
@@ -1044,18 +1043,15 @@ function toApiContents(contents) {
 }
 
 async function callGemini(contents, maxTokens = 2000) {
-  const body = {
+  const payload = {
     system_instruction: { parts: [{ text: SYSTEM }] },
     generation_config: { max_output_tokens: maxTokens },
     contents: toApiContents(contents)
   };
-  const res = await fetch(GEMINI_URL, {
+  const res = await fetch('/api/gemini', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY
-    },
-    body: JSON.stringify(body)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: GEMINI_MODEL, payload })
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`API error: ${res.status} ${text}`);
@@ -1114,13 +1110,6 @@ function captureAndRead() {
 async function beginReading() {
   history=[]; chatScroll.innerHTML='';
   addTyping();
-
-  if (GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY' || !GEMINI_API_KEY.trim()) {
-    removeTyping();
-    addMsg('ai','Please add your Gemini API key. Get a free key from https://aistudio.google.com/apikey and set GEMINI_API_KEY in the script (top of index.html).');
-    chatInput.disabled=false; sendBtn.disabled=false;
-    return;
-  }
 
   try {
     const dobStr = userDob || 'not provided';
@@ -1182,13 +1171,6 @@ async function sendMessage(prefilled) {
   if(!text||busy) return;
   busy=true; chatInput.value=''; sendBtn.disabled=true;
   addMsg('user', text);
-
-  if (GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY' || !GEMINI_API_KEY.trim()) {
-    removeTyping();
-    addMsg('ai','Please configure your Gemini API key first.');
-    busy=false; sendBtn.disabled=false; chatInput.focus();
-    return;
-  }
 
   history.push({ role: 'user', parts: [{ text }] });
   addTyping();
@@ -1346,6 +1328,15 @@ function exportLogs(){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+// Expose for inline handlers (onclick etc.)
+window.startCamera = startCamera;
+window.captureAndRead = captureAndRead;
+window.checkUserInfo = checkUserInfo;
+window.sendMessage = sendMessage;
+window.handleKey = handleKey;
+window.newReading = newReading;
+window.exportLogs = exportLogs;
+});
 </script>
 </body>
 </html>
