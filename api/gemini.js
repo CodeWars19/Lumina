@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
     return res.status(500).json({
       error: 'GEMINI_API_KEY is not set. Add it under Vercel → Project → Settings → Environment Variables.'
@@ -24,10 +24,15 @@ module.exports = async (req, res) => {
     }
   }
 
-  const model = body?.model;
   const payload = body?.payload;
-  if (!model || !payload || typeof payload !== 'object') {
-    return res.status(400).json({ error: 'Missing model or payload' });
+  if (!payload || typeof payload !== 'object') {
+    return res.status(400).json({ error: 'Missing payload' });
+  }
+
+  // Prefer GEMINI_MODEL from Vercel so you can fix 403s without redeploying the HTML.
+  const model = (process.env.GEMINI_MODEL || body.model || '').trim();
+  if (!model) {
+    return res.status(400).json({ error: 'Missing model (set GEMINI_MODEL in Vercel or send model in body)' });
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
