@@ -1,7 +1,49 @@
 /**
- * Proxies Gemini generateContent so the API key stays in Vercel env (GEMINI_API_KEY).
- * POST body: { model: string, payload: object } — payload is the Gemini JSON body.
+ * Proxies Gemini generateContent. Key from Vercel env GEMINI_API_KEY.
+ * POST JSON: { model?: string, payload: object }
+ * Optional env: GEMINI_MODEL (overrides client model).
  */
+
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    if (Buffer.isBuffer(req.body)) {
+      try {
+        resolve(req.body.length ? JSON.parse(req.body.toString('utf8')) : {});
+      } catch (e) {
+        reject(e);
+      }
+      return;
+    }
+    if (typeof req.body === 'string') {
+      try {
+        resolve(req.body ? JSON.parse(req.body) : {});
+      } catch (e) {
+        reject(e);
+      }
+      return;
+    }
+    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+      resolve(req.body);
+      return;
+    }
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        if (raw) {
+          resolve(JSON.parse(raw));
+          return;
+        }
+        resolve(req.body && typeof req.body === 'object' ? req.body : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -11,31 +53,27 @@ module.exports = async (req, res) => {
   const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
     return res.status(500).json({
-      error: 'GEMINI_API_KEY is not set. Add it under Vercel → Project → Settings → Environment Variables.'
+      error: 'GEMINI_API_KEY is not set in Vercel environment variables.'
     });
   }
 
-  let body = req.body;
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      return res.status(400).json({ error: 'Invalid JSON body' });
-    }
+  let body;
+  try {
+    body = await readRequestBody(req);
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
   const payload = body?.payload;
   if (!payload || typeof payload !== 'object') {
-    return res.status(400).json({ error: 'Missing payload' });
+    return res.status(400).json({
+      error: 'Missing payload. Expected { model?, payload: { contents, ... } }'
+    });
   }
 
-  // Prefer GEMINI_MODEL from Vercel so you can fix 403s without redeploying the HTML.
-  const model = (process.env.GEMINI_MODEL || body.model || '').trim();
-  if (!model) {
-    return res.status(400).json({ error: 'Missing model (set GEMINI_MODEL in Vercel or send model in body)' });
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const model = (process.env.GEMINI_MODEL || body.model || 'gemini-2.5-flash').trim();
+  const keyQs = `key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?${keyQs}`;
 
   const upstream = await fetch(url, {
     method: 'POST',
