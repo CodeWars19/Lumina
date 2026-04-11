@@ -791,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Config ─────────────────────────────────────────
 // API key is read server-side from Vercel env GEMINI_API_KEY (see /api/gemini.js).
 // Use a model your key can access (AI Studio / Cloud). Override with Vercel env GEMINI_MODEL.
-const GEMINI_MODEL = 'gemini-2-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // ── Stars ──────────────────────────────────────────
 const sc = document.getElementById('star-canvas');
@@ -1036,7 +1036,7 @@ function toApiContents(contents) {
     role: c.role || 'user',
     parts: c.parts.map(p => {
       if (p.inlineData) {
-        return { inline_data: { mime_type: p.inlineData.mimeType, data: p.inlineData.data } };
+        return { inlineData: { mimeType: p.inlineData.mimeType, data: p.inlineData.data } };
       }
       return { text: p.text };
     })
@@ -1045,8 +1045,8 @@ function toApiContents(contents) {
 
 async function callGemini(contents, maxTokens = 2000) {
   const payload = {
-    system_instruction: { parts: [{ text: SYSTEM }] },
-    generation_config: { max_output_tokens: maxTokens },
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    generationConfig: { maxOutputTokens: maxTokens },
     contents: toApiContents(contents)
   };
   const res = await fetch('/api/gemini', {
@@ -1055,10 +1055,22 @@ async function callGemini(contents, maxTokens = 2000) {
     body: JSON.stringify({ model: GEMINI_MODEL, payload })
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`API error: ${res.status} ${text}`);
-  const data = JSON.parse(text);
+  if (!res.ok) {
+    let detail = text;
+    try {
+      const j = JSON.parse(text);
+      detail = j.error?.message || j.error || JSON.stringify(j);
+    } catch { /* keep raw */ }
+    throw new Error(`API error: ${res.status} — ${detail}`);
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON from server. Is /api/gemini deployed? Check Vercel → Functions.');
+  }
   const out = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!out) throw new Error('No response from model');
+  if (!out) throw new Error(data.error?.message || 'No response from model');
   return out;
 }
 
