@@ -1,6 +1,6 @@
 {
-  "buildCommand": "",
-  "outputDirectory": ".",
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
   "headers": [
     {
       "source": "/(.*)",
@@ -13,4 +13,3 @@
     }
   ]
 }
-
